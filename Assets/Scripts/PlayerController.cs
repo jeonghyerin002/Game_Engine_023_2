@@ -2,11 +2,11 @@ using Cinemachine;
 using System.Collections;
 using System.Collections.Generic;
 using Unity.VisualScripting;
-using UnityEditor;
 using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
+
 
     public CinemachineSwitcher cS;
     public float speed = 5f;
@@ -86,4 +86,6 @@ public class PlayerController : MonoBehaviour
             jumpPower = 5;
         }
     }
+
+    
 }

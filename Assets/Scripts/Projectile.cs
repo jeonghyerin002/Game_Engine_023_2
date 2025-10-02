@@ -7,7 +7,7 @@ public class Projectile : MonoBehaviour
 
     public float speed = 20f;           // 이동속도  
     public float lifeTime = 2f;         //생존 시간
-    public float attack = 5f;
+    public int attack = 5;
 
     void Start()
     {

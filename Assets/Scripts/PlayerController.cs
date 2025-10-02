@@ -3,6 +3,8 @@ using System.Collections;
 using System.Collections.Generic;
 using Unity.VisualScripting;
 using UnityEngine;
+using UnityEngine.UI;
+
 
 public class PlayerController : MonoBehaviour
 {
@@ -20,17 +22,30 @@ public class PlayerController : MonoBehaviour
     private Vector3 velocity;
     private bool isGrounded;
 
+    public int maxHP = 100;
+    private int currentHP;
+    public Slider hpSlider;
+
     void Start()
     {
         controller = GetComponent<CharacterController>();
         pov = virtualCam.GetCinemachineComponent<CinemachinePOV>();
 
+        currentHP = maxHP;
+        hpSlider.value = 1f;
         Cursor.lockState = CursorLockMode.Locked;
     }
 
 
     void Update()
     {
+
+        if (Input.GetKeyDown(KeyCode.Tab))
+        {
+            pov.m_HorizontalAxis.Value = transform.eulerAngles.y;
+            pov.m_VerticalAxis.Value = 0f;
+        }
+
         isGrounded = controller.isGrounded;
         if(isGrounded && velocity.y < 0)
         {
@@ -85,6 +100,23 @@ public class PlayerController : MonoBehaviour
             speed = 5;
             jumpPower = 5;
         }
+
+        
+    }
+    public void TakeDamage(int damage)
+    {
+        currentHP -= damage;
+        hpSlider.value = (float)currentHP / maxHP;
+
+        if(currentHP <= 0)
+        {
+            Die();
+        }
+    }
+
+    void Die()
+    {
+        Destroy(gameObject);
     }
 
     

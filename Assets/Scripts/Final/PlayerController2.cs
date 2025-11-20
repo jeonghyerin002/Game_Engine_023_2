@@ -35,6 +35,7 @@ public class PlayerController2 : MonoBehaviour
     {
         HandleMove();
         HandleLook();
+
     }
     void HandleMove()
     {

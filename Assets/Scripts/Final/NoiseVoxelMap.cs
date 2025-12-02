@@ -66,16 +66,49 @@ public class NoiseVoxelMap : MonoBehaviour
     void DirtPlace(int x, int y, int z)
     {
         var go = Instantiate(dirtBlockPrefab, new Vector3(x, y, z), Quaternion.identity, transform);
-        go.name = $"B_{x}_{y}_{z}";
+        go.name = $"Dirt_{x}_{y}_{z}";
+
+        var b = go.GetComponent<Block>() ?? go.AddComponent<Block>();
+        b.type = BlockType.Dirt;
+        b.maxHP = 3;
+        b.dropCount = 1;
+        b.mineable = true;
+
     }
     void GrassPlace(int x, int y, int z)
     {
         var go = Instantiate(grassBlockPrefab, new Vector3(x, y, z), Quaternion.identity, transform);
-        go.name = $"B_{x}_{y}_{z}";
+        go.name = $"Grass_{x}_{y}_{z}";
+
+        var b = go.GetComponent<Block>() ?? go.AddComponent<Block>();
+        b.type = BlockType.Grass;
+        b.maxHP = 3;
+        b.dropCount = 1;
+        b.mineable = true;
     }
     void WaterPlace(int x, int y, int z)
     {
         var go = Instantiate(waterBlockPrefab, new Vector3(x, y, z), Quaternion.identity, transform);
-        go.name = $"B_{x}_{y}_{z}";
+        go.name = $"Water_{x}_{y}_{z}";
+
+        var b = go.GetComponent<Block>() ?? go.AddComponent<Block>();
+        b.type = BlockType.Water;
+        b.maxHP = 3;
+        b.dropCount = 1;
+        b.mineable = true;
+    }
+    public void PlaceTile(Vector3Int pos, BlockType type)
+    {
+        switch (type)
+        {
+            case BlockType.Dirt:
+                DirtPlace(pos.x, pos.y, pos.z);
+                break;
+            case BlockType.Grass:
+                GrassPlace(pos.x, pos.y, pos.z);
+                break;
+        }
+
+
     }
 }

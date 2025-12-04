@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Net.Sockets;
 using UnityEngine;
 
 public class PlayerController2 : MonoBehaviour
@@ -27,7 +28,7 @@ public class PlayerController2 : MonoBehaviour
     }
     void Start()
     {
-        
+        Cursor. lockState = CursorLockMode.Locked;
     }
 
 

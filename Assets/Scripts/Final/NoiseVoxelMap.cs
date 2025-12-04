@@ -10,9 +10,11 @@ public class NoiseVoxelMap : MonoBehaviour
     public GameObject grassBlockPrefab;
     public GameObject dirtBlockPrefab;
     public GameObject waterBlockPrefab;
+    public GameObject diamondBlockPrefab;
     public int width = 20;
     public int depth = 20;
     public int maxHeight = 16;
+    public float randomBlock = 0.2f;
     [SerializeField] float noiseScale = 20f;
 
 
@@ -42,7 +44,13 @@ public class NoiseVoxelMap : MonoBehaviour
                     }
                     else
                     {
-                        DirtPlace(x, y, z);
+                        float randomP = Random.Range(0, 1);
+                        if (randomBlock < randomP)
+                            DiamondPlace(x, y, z);
+                        else
+                        {
+                            DirtPlace(x, y, z);
+                        }
                     }
                 }
                 for(int y = h+1; y <= 4; y++)
@@ -69,7 +77,19 @@ public class NoiseVoxelMap : MonoBehaviour
         go.name = $"Dirt_{x}_{y}_{z}";
 
         var b = go.GetComponent<Block>() ?? go.AddComponent<Block>();
-        b.type = BlockType.Dirt;
+        b.type = ItemType.Dirt;
+        b.maxHP = 3;
+        b.dropCount = 1;
+        b.mineable = true;
+
+    }
+    void DiamondPlace(int x, int y, int z)
+    {
+        var go = Instantiate(diamondBlockPrefab, new Vector3(x, y, z), Quaternion.identity, transform);
+        go.name = $"diamond_{x}_{y}_{z}";
+
+        var b = go.GetComponent<Block>() ?? go.AddComponent<Block>();
+        b.type = ItemType.Diamond;
         b.maxHP = 3;
         b.dropCount = 1;
         b.mineable = true;
@@ -81,7 +101,7 @@ public class NoiseVoxelMap : MonoBehaviour
         go.name = $"Grass_{x}_{y}_{z}";
 
         var b = go.GetComponent<Block>() ?? go.AddComponent<Block>();
-        b.type = BlockType.Grass;
+        b.type = ItemType.Grass;
         b.maxHP = 3;
         b.dropCount = 1;
         b.mineable = true;
@@ -92,19 +112,20 @@ public class NoiseVoxelMap : MonoBehaviour
         go.name = $"Water_{x}_{y}_{z}";
 
         var b = go.GetComponent<Block>() ?? go.AddComponent<Block>();
-        b.type = BlockType.Water;
+        b.type = ItemType.Water;
         b.maxHP = 3;
         b.dropCount = 1;
         b.mineable = true;
     }
-    public void PlaceTile(Vector3Int pos, BlockType type)
+
+    public void PlaceTile(Vector3Int pos, ItemType type)
     {
         switch (type)
         {
-            case BlockType.Dirt:
+            case ItemType.Dirt:
                 DirtPlace(pos.x, pos.y, pos.z);
                 break;
-            case BlockType.Grass:
+            case ItemType.Grass:
                 GrassPlace(pos.x, pos.y, pos.z);
                 break;
         }

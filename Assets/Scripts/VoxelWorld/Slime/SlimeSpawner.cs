@@ -62,8 +62,8 @@ public class SlimeSpawner : MonoBehaviour
         slimeObj.tag = "Slime";
 
         // 쫀득 점프/채집 로직 붙이고 싶으면 여기서 스크립트 추가
-        if (slimeObj.GetComponent<SlimeHarvester>() == null)
-            slimeObj.AddComponent<SlimeHarvester>();
+        if (slimeObj.GetComponent<SlimeGridWalker>() == null)
+            slimeObj.AddComponent<SlimeGridWalker>();
     }
 
     Vector3 GetSpawnPosition()

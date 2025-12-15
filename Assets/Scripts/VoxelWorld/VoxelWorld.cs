@@ -22,6 +22,9 @@ public class VoxelWorld : MonoBehaviour
     public VoxelData Data { get; private set; }
     public VoxelPicker Picker { get; private set; }
 
+    [Header("Layers")]
+    public string groundLayerName = "Ground";
+
 
     void Start()
     {
@@ -32,7 +35,7 @@ public class VoxelWorld : MonoBehaviour
         // 메시 빌드
         var builder = new VoxelMeshBuilder(Data);
         builder.Build(transform, grassMaterial, dirtMaterial, waterMaterial);
-
+        ApplyLayerToWorldMeshes();
         // 피커 초기화
         Picker = new VoxelPicker(Data);
 
@@ -65,6 +68,7 @@ public class VoxelWorld : MonoBehaviour
         Data.Generate(maxHeight, waterLevel, noiseScale);
         var builder = new VoxelMeshBuilder(Data);
         builder.Build(transform, grassMaterial, dirtMaterial, waterMaterial);
+        ApplyLayerToWorldMeshes();
     }
 
     // 새 시드로 재생성
@@ -73,5 +77,29 @@ public class VoxelWorld : MonoBehaviour
         seed = Random.Range(0, int.MaxValue);
         Data = new VoxelData(width, maxHeight + waterLevel + 1, depth, seed);
         Regenerate();
+    }
+
+    void ApplyLayerToWorldMeshes()
+    {
+        int groundLayer = LayerMask.NameToLayer(groundLayerName);
+        if (groundLayer == -1)
+        {
+            Debug.LogWarning($"Layer '{groundLayerName}' 가 없습니다.");
+            return;
+        }
+
+        foreach (Transform child in transform)
+        {
+            SetLayerRecursively(child.gameObject, groundLayer);
+        }
+    }
+
+    static void SetLayerRecursively(GameObject obj, int layer)
+    {
+        obj.layer = layer;
+        for (int i = 0; i < obj.transform.childCount; i++)
+        {
+            SetLayerRecursively(obj.transform.GetChild(i).gameObject, layer);
+        }
     }
 }

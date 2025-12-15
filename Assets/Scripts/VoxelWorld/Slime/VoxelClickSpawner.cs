@@ -3,16 +3,23 @@ using UnityEngine;
 public class VoxelClickSpawner : MonoBehaviour
 {
     [Header("필수 레퍼런스")]
-    public VoxelWorld voxelWorld;      // 월드 오브젝트
-    public SlimeBuildUI buildUI;       // 현재 모드 정보
+    public VoxelWorld voxelWorld;
+    public SlimeBuildUI buildUI;
 
-    [Header("프리팹")]
-    public GameObject[] orePrefabs;    // 0~4 => 광석1~5 (금, 은, 동, 구리, 철)
+    [Header("프리팹 (없으면 큐브로 생성)")]
+    public GameObject copperPrefab;
+    public GameObject silverPrefab;
+    public GameObject goldPrefab;
+    public GameObject metalPrefab;
+    public GameObject mithrilPrefab;
     public GameObject slimeSpawnerPrefab;
 
     [Header("정리용 부모")]
     public Transform oreParent;
     public Transform spawnerParent;
+
+    [Header("비용 사용")]
+    public bool enableCost = true;
 
     void Start()
     {
@@ -31,145 +38,136 @@ public class VoxelClickSpawner : MonoBehaviour
 
     void Update()
     {
-        if (Input.GetMouseButtonDown(0))
+        if (!Input.GetMouseButtonDown(0)) return;
+
+        if (voxelWorld == null || voxelWorld.Picker == null) return;
+        if (buildUI == null) return;
+
+        // UI에게 "이번에 뭘 설치할지"만 물어봄 (모드/비용/타입은 UI가 책임)
+        if (!buildUI.TryGetBuildRequest(out var req)) return;
+
+        var cam = Camera.main;
+        if (cam == null) return;
+
+        Ray ray = cam.ScreenPointToRay(Input.mousePosition);
+        var placePos = voxelWorld.Picker.GetPlacementPosition(ray);
+        if (!placePos.HasValue) return;
+
+        Vector3Int blockPos = placePos.Value;
+        Vector3 worldPos = new Vector3(blockPos.x, blockPos.y, blockPos.z);
+
+        var gm = SlimeGameManager.Instance;
+
+        // 비용 처리(여기 한 곳에서만)
+        if (enableCost && gm != null)
         {
-            if (voxelWorld == null || voxelWorld.Picker == null) return;
-            if (buildUI == null || buildUI.currentMode == SlimeBuildMode.None) return;
+            if (!gm.CanSpendResource(ResourceType.Coin, req.costCoin)) return;
+            if (!gm.SpendResource(ResourceType.Coin, req.costCoin)) return;
+        }
 
-            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-            var placePos = voxelWorld.Picker.GetPlacementPosition(ray);
-            if (!placePos.HasValue) return;
+        // 설치 실행
+        if (req.isSpawner)
+        {
+            SpawnSpawner(worldPos);
+        }
+        else
+        {
+            GameObject prefab = GetOrePrefab(req.oreType);
+            SpawnOre(req.oreType, prefab, worldPos);
+        }
+    }
 
-            Vector3Int blockPos = placePos.Value;
-            Vector3 worldPos = new Vector3(blockPos.x, blockPos.y, blockPos.z);
+    GameObject GetOrePrefab(ResourceType type)
+    {
+        switch (type)
+        {
+            case ResourceType.Copper: return copperPrefab;
+            case ResourceType.Silver: return silverPrefab;
+            case ResourceType.Gold: return goldPrefab;
+            case ResourceType.Metal: return metalPrefab;
+            case ResourceType.Mithril: return mithrilPrefab;
+            default: return null;
+        }
+    }
 
-            switch (buildUI.currentMode)
+    void SpawnSpawner(Vector3 worldPos)
+    {
+        GameObject spawnerObj;
+
+        if (slimeSpawnerPrefab != null)
+        {
+            spawnerObj = Instantiate(
+                slimeSpawnerPrefab,
+                worldPos + Vector3.up * 0.5f,
+                Quaternion.identity,
+                spawnerParent
+            );
+        }
+        else
+        {
+            spawnerObj = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            spawnerObj.transform.position = worldPos + Vector3.up * 0.5f;
+            spawnerObj.transform.localScale = Vector3.one * 0.85f;
+            spawnerObj.transform.SetParent(spawnerParent);
+
+            var renderer = spawnerObj.GetComponent<MeshRenderer>();
+            if (renderer != null)
             {
-                case SlimeBuildMode.Ore1:
-                case SlimeBuildMode.Ore2:
-                case SlimeBuildMode.Ore3:
-                case SlimeBuildMode.Ore4:
-                case SlimeBuildMode.Ore5:
-                    int idx = (int)buildUI.currentMode - (int)SlimeBuildMode.Ore1;
-                    SpawnOre(idx, worldPos);
-                    break;
-
-                case SlimeBuildMode.SlimeSpawner:
-                    {
-                        GameObject spawnerObj = null;
-
-                        // 1) 프리팹이 있으면 프리팹 사용
-                        if (slimeSpawnerPrefab != null)
-                        {
-                            spawnerObj = Instantiate(
-                                slimeSpawnerPrefab,
-                                worldPos + Vector3.up * 0.5f,
-                                Quaternion.identity,
-                                spawnerParent
-                            );
-                        }
-                        else
-                        {
-                            // 2) 프리팹 없으면 핑크 상자 자동 생성
-                            spawnerObj = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                            spawnerObj.transform.position = worldPos + Vector3.up * 0.5f;
-                            spawnerObj.transform.localScale = Vector3.one * 0.85f;
-                            spawnerObj.transform.SetParent(spawnerParent);
-
-                            var renderer = spawnerObj.GetComponent<MeshRenderer>();
-                            if (renderer != null)
-                            {
-                                Material mat = new Material(Shader.Find("Standard"));
-                                mat.color = new Color(1f, 0.6f, 1f);  // 파스텔 핑크
-                                mat.SetFloat("_Metallic", 0.2f);
-                                mat.SetFloat("_Glossiness", 0.7f);
-                                renderer.material = mat;
-                            }
-                        }
-
-                        spawnerObj.name = "SlimeSpawner";
-
-                        var spawnerComp = spawnerObj.GetComponent<SlimeSpawner>();
-                        if (spawnerComp == null)
-                            spawnerComp = spawnerObj.AddComponent<SlimeSpawner>();
-
-                        break;
-                    }
+                Material mat = new Material(Shader.Find("Standard"));
+                mat.color = new Color(1f, 0.6f, 1f);
+                mat.SetFloat("_Metallic", 0.2f);
+                mat.SetFloat("_Glossiness", 0.7f);
+                renderer.material = mat;
             }
         }
 
-        void SpawnOre(int idx, Vector3 worldPos)
+        spawnerObj.name = "SlimeSpawner";
+
+        var spawnerComp = spawnerObj.GetComponent<SlimeSpawner>();
+        if (spawnerComp == null)
+            spawnerComp = spawnerObj.AddComponent<SlimeSpawner>();
+    }
+
+    void SpawnOre(ResourceType type, GameObject prefab, Vector3 worldPos)
+    {
+        GameObject ore;
+
+        if (prefab != null)
         {
-            GameObject ore = null;
+            ore = Instantiate(prefab, worldPos, Quaternion.identity, oreParent);
+        }
+        else
+        {
+            ore = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            ore.transform.position = worldPos;
+            ore.transform.localScale = Vector3.one * 0.9f;
+            ore.transform.SetParent(oreParent);
 
-            // 1) 프리팹이 있으면 프리팹 우선
-            if (orePrefabs != null &&
-                idx >= 0 &&
-                idx < orePrefabs.Length &&
-                orePrefabs[idx] != null)
+            var renderer = ore.GetComponent<MeshRenderer>();
+            if (renderer != null)
             {
-                ore = Instantiate(orePrefabs[idx], worldPos, Quaternion.identity, oreParent);
+                var mat = new Material(Shader.Find("Standard"));
+                mat.color = GetOreColor(type);
+                mat.SetFloat("_Metallic", 0.9f);
+                mat.SetFloat("_Glossiness", 0.75f);
+                renderer.material = mat;
             }
-            else
-            {
-                // 2) 프리팹이 없으면 Primitive Cube + 색깔로 생성
-                ore = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                ore.transform.position = worldPos;
-                ore.transform.localScale = Vector3.one * 0.9f;
-                ore.transform.SetParent(oreParent);
+        }
 
-                // 머티리얼 생성해서 색 지정
-                var renderer = ore.GetComponent<MeshRenderer>();
-                if (renderer != null)
-                {
-                    var mat = new Material(Shader.Find("Standard"));
-                    Color c = Color.white;
-                    float metallic = 0.8f;
-                    float smoothness = 0.6f;
+        ore.name = type + "_Ore";
+        ore.tag = type.ToString(); // CollectOreByTag가 이해하는 태그 (Copper/Silver/Gold/Metal/Mithril)
+    }
 
-                    switch (idx)
-                    {
-                        case 0: // 금
-                            c = new Color(1.0f, 0.84f, 0.0f); // Gold-ish
-                            metallic = 1.0f;
-                            smoothness = 0.9f;
-                            break;
-                        case 1: // 은
-                            c = new Color(0.9f, 0.9f, 0.95f);
-                            metallic = 0.95f;
-                            smoothness = 0.9f;
-                            break;
-                        case 2: // 동
-                            c = new Color(0.8f, 0.5f, 0.2f);
-                            metallic = 0.8f;
-                            smoothness = 0.7f;
-                            break;
-                        case 3: // 구리
-                            c = new Color(0.9f, 0.45f, 0.2f);
-                            metallic = 0.9f;
-                            smoothness = 0.75f;
-                            break;
-                        case 4: // 철
-                            c = new Color(0.6f, 0.6f, 0.65f);
-                            metallic = 0.9f;
-                            smoothness = 0.6f;
-                            break;
-                        default:
-                            c = Color.gray;
-                            metallic = 0.5f;
-                            smoothness = 0.5f;
-                            break;
-                    }
-
-                    mat.color = c;
-                    mat.SetFloat("_Metallic", metallic);
-                    mat.SetFloat("_Glossiness", smoothness);
-                    renderer.material = mat;
-                }
-            }
-
-            ore.name = $"OreType{idx + 1}";
-            ore.tag = $"Ore{idx + 1}"; // Ore1~Ore5 태그
+    Color GetOreColor(ResourceType type)
+    {
+        switch (type)
+        {
+            case ResourceType.Copper: return new Color(0.784f, 0.459f, 0.2f);
+            case ResourceType.Silver: return new Color(0.79f, 0.81f, 0.84f);
+            case ResourceType.Gold: return new Color(0.949f, 0.788f, 0.298f);
+            case ResourceType.Metal: return new Color(0.48f, 0.54f, 0.60f);
+            case ResourceType.Mithril: return new Color(0.48f, 0.42f, 1.0f);
+            default: return Color.gray;
         }
     }
 }

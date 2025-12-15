@@ -7,6 +7,17 @@ TagManager:
   - Enemy
   - Block
   - Slime
+  - Copper
+  - Silver
+  - Gold
+  - Metal
+  - Mithril
+  - Soil
+  - Ore1
+  - Ore2
+  - Ore3
+  - Ore4
+  - Ore5
   layers:
   - Default
   - TransparentFX
@@ -14,7 +25,7 @@ TagManager:
   - 
   - Water
   - UI
-  - 
+  - Ground
   - 
   - 
   - 

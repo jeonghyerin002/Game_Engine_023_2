@@ -27,7 +27,7 @@ public class SlimeGridWalker : MonoBehaviour
     [Header("¼öÈ® ¼³Á¤")]
     public bool harvestOres = true;            // ±¤¸Æ(¿ÀºêÁ§Æ® ÅÂ±×)
     public bool harvestGroundBlocks = true;    // ¶¥(BlockType)
-    public float harvestRadius = 0.45f;
+    private float harvestRadius = 1f;
     public LayerMask harvestMask = ~0;
 
     [Header("±¤¸Æ ¼öÈ® Äğ´Ù¿î")]

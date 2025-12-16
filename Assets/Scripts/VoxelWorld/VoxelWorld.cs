@@ -20,6 +20,14 @@ public class VoxelWorld : MonoBehaviour
     public VoxelData Data { get; private set; }
     public VoxelPicker Picker { get; private set; }
 
+    public string groundLayer = "Ground";
+
+    void Awake()
+    {
+        // 유니티 창이 백그라운드여도 계속 실행되게 함
+        Application.runInBackground = true;
+    }
+
     void Start()
     {
         Regenerate();
@@ -43,9 +51,35 @@ public class VoxelWorld : MonoBehaviour
         var builder = new VoxelMeshBuilder(Data);
         builder.Build(transform, grassMaterial, dirtMaterial, waterMaterial);
 
+        ApplyGroundLayerToChildren();
+
         // 피커
         Picker = new VoxelPicker(Data);
 
         Debug.Log($"[VoxelWorld] Regenerated with seed={seed}");
+    }
+
+    void ApplyGroundLayerToChildren()
+    {
+        int layer = LayerMask.NameToLayer(groundLayer);
+        if (layer == -1)
+        {
+            Debug.LogWarning($"[VoxelWorld] Layer '{groundLayer}' does not exist.");
+            return;
+        }
+
+        foreach (Transform child in transform)
+        {
+            SetLayerRecursively(child.gameObject, layer);
+        }
+    }
+
+    void SetLayerRecursively(GameObject obj, int layer)
+    {
+        obj.layer = layer;
+        for (int i = 0; i < obj.transform.childCount; i++)
+        {
+            SetLayerRecursively(obj.transform.GetChild(i).gameObject, layer);
+        }
     }
 }

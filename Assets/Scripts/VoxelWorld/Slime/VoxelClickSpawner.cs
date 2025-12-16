@@ -1,54 +1,65 @@
-using UnityEngine;
+Ôªøusing UnityEngine;
+using UnityEngine.EventSystems;
 
 public class VoxelClickSpawner : MonoBehaviour
 {
-    [Header("« ºˆ ∑π∆€∑±Ω∫")]
+    [Header("ÌïÑÏàò Î†àÌçºÎü∞Ïä§")]
     public VoxelWorld voxelWorld;
-    public SlimeBuildUI buildUI;
-    public SlimePlanetSaveManager save; // «‡º∫∫∞ ¿˙¿Â∏≈¥œ¿˙
+    public SlimePlanetSaveManager save;
 
-    [Header("«¡∏Æ∆’ (æ¯¿∏∏È ≈•∫Í∑Œ ª˝º∫)")]
+    [Header("ÎπåÎìú UI (Í¥ëÏÑù / Ïä§Ìè¨ÎÑà)")]
+    public SlimeBuildUI buildUI;
+
+    [Header("ÌÜ†ÌÉ¨ UI")]
+    public TotemBuildUI totemUI;
+
+    [Header("ÌÜ†ÌÉ¨ ÌîÑÎ¶¨Ìåπ ÎùºÏù¥Î∏åÎü¨Î¶¨ (6Ï¢Ö)")]
+    public TotemPrefabLibrary totemPrefabs;
+
+    [Header("Í¥ëÏÑù ÌîÑÎ¶¨Ìåπ")]
     public GameObject copperPrefab;
     public GameObject silverPrefab;
     public GameObject goldPrefab;
     public GameObject metalPrefab;
     public GameObject mithrilPrefab;
+
+    [Header("Ïä§Ìè¨ÎÑà ÌîÑÎ¶¨Ìåπ")]
     public GameObject slimeSpawnerPrefab;
 
-    [Header("¡§∏ÆøÎ ∫Œ∏(æ¯¿∏∏È ¿⁄µø √£±‚/ª˝º∫)")]
+    [Header("Î∂ÄÎ™® Ïò§Î∏åÏ†ùÌä∏")]
     public Transform oreParent;
     public Transform spawnerParent;
+    public Transform totemParent;
 
-    [Header("∫ÒøÎ ªÁøÎ")]
+    [Header("ÎπÑÏö© ÏÇ¨Ïö©")]
     public bool enableCost = true;
+
+    [Header("UI ÌÅ¥Î¶≠ Ï∞®Îã®")]
+    public bool blockWorldClickWhenPointerOverUI = true;
+
+    [Header("Ïä§Ìè¨ÎÑà ÏÑ§Ïπò Í∞ÄÍ≤© Ï¶ùÍ∞Ä")]
+    public long spawnerBaseCost = 0;
+    public long spawnerCostStep = 1000;
 
     void Start()
     {
         if (save == null) save = FindObjectOfType<SlimePlanetSaveManager>();
+        if (totemPrefabs == null) totemPrefabs = FindObjectOfType<TotemPrefabLibrary>();
 
-        if (oreParent == null)
-        {
-            var found = GameObject.Find("OreObjects");
-            if (found == null) found = new GameObject("OreObjects");
-            oreParent = found.transform;
-        }
-
-        if (spawnerParent == null)
-        {
-            var found = GameObject.Find("SlimeSpawners");
-            if (found == null) found = new GameObject("SlimeSpawners");
-            spawnerParent = found.transform;
-        }
+        EnsureParent(ref oreParent, "OreObjects");
+        EnsureParent(ref spawnerParent, "SlimeSpawners");
+        EnsureParent(ref totemParent, "TotemTowers");
     }
 
     void Update()
     {
         if (!Input.GetMouseButtonDown(0)) return;
 
-        if (voxelWorld == null || voxelWorld.Picker == null) return;
-        if (buildUI == null) return;
+        // UI ÏúÑ ÌÅ¥Î¶≠Ïù¥Î©¥ ÏõîÎìú ÏÑ§Ïπò Ï∞®Îã®
+        if (blockWorldClickWhenPointerOverUI && IsPointerOverUI())
+            return;
 
-        if (!buildUI.TryGetBuildRequest(out var req)) return;
+        if (voxelWorld == null || voxelWorld.Picker == null) return;
 
         var cam = Camera.main;
         if (cam == null) return;
@@ -60,26 +71,139 @@ public class VoxelClickSpawner : MonoBehaviour
         Vector3Int p = placePos.Value;
         Vector3 worldPos = new Vector3(p.x + 0.5f, p.y + 0.5f, p.z + 0.5f);
 
-        var gm = SlimeGameManager.Instance;
-
-        if (enableCost && gm != null)
+        // =================================================
+        // 1Ô∏èÌÜ†ÌÉ¨ ÏÑ§Ïπò (ÏµúÏö∞ÏÑ†)
+        // =================================================
+        if (totemUI != null && totemUI.TryGetTotemRequest(out TotemType tType, out long tCost))
         {
-            if (!gm.CanSpendResource(ResourceType.Coin, req.costCoin)) return;
-            if (!gm.SpendResource(ResourceType.Coin, req.costCoin)) return;
+            if (!TryPayCoin(tCost)) return;
+
+            SpawnTotem(tType, worldPos);
+            totemUI.ClearSelection();
+            save?.SaveNow();
+            return;
         }
+
+        // =================================================
+        // 2Ô∏èÍ¥ëÏÑù / Ïä§Ìè¨ÎÑà ÏÑ§Ïπò
+        // =================================================
+        if (buildUI == null) return;
+        if (!buildUI.TryGetBuildRequest(out var req)) return;
+
+        if (req.isSpawner)
+        {
+            int count = GetCurrentSpawnerCount();
+            req.costCoin = spawnerBaseCost + count * spawnerCostStep;
+        }
+
+        if (!TryPayCoin(req.costCoin)) return;
 
         if (req.isSpawner)
         {
             SpawnSpawner(worldPos);
-            save?.SaveNow(); // º≥ƒ° ¡˜»ƒ «‡º∫∫∞ ¿˙¿Â
         }
         else
         {
             SpawnOre(req.oreType, GetOrePrefab(req.oreType), worldPos);
-            save?.SaveNow(); // º≥ƒ° ¡˜»ƒ «‡º∫∫∞ ¿˙¿Â
         }
+
+        save?.SaveNow();
     }
 
+    // =================================================
+    // ÎπÑÏö© Ï≤òÎ¶¨
+    // =================================================
+    bool TryPayCoin(long cost)
+    {
+        if (!enableCost) return true;
+
+        var gm = SlimeGameManager.Instance;
+        if (gm == null) return false;
+
+        if (!gm.CanSpendResource(ResourceType.Coin, cost)) return false;
+        if (!gm.SpendResource(ResourceType.Coin, cost)) return false;
+        return true;
+    }
+
+    // =================================================
+    // Spawn
+    // =================================================
+    void SpawnOre(ResourceType type, GameObject prefab, Vector3 pos)
+    {
+        GameObject ore;
+
+        if (prefab != null)
+            ore = Instantiate(prefab, pos, Quaternion.identity, oreParent);
+        else
+        {
+            ore = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            ore.transform.SetParent(oreParent);
+            ore.transform.position = pos;
+            ore.transform.localScale = Vector3.one * 0.9f;
+            OreVisualUtil.ApplyOreMaterial(ore, type);
+        }
+
+        ore.name = type + "_Ore";
+
+        var marker = ore.GetComponent<PlacedOreMarker>();
+        if (marker == null) marker = ore.AddComponent<PlacedOreMarker>();
+        marker.oreType = type;
+
+        ore.tag = type.ToString();
+    }
+
+    void SpawnSpawner(Vector3 pos)
+    {
+        GameObject obj;
+
+        if (slimeSpawnerPrefab != null)
+            obj = Instantiate(slimeSpawnerPrefab, pos, Quaternion.identity, spawnerParent);
+        else
+        {
+            obj = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            obj.transform.SetParent(spawnerParent);
+            obj.transform.position = pos;
+            obj.transform.localScale = Vector3.one * 0.85f;
+            OreVisualUtil.ApplySpawnerMaterial(obj);
+        }
+
+        obj.name = "SlimeSpawner";
+
+        if (obj.GetComponent<SlimeSpawner>() == null)
+            obj.AddComponent<SlimeSpawner>();
+    }
+
+    void SpawnTotem(TotemType type, Vector3 pos)
+    {
+        GameObject prefab = (totemPrefabs != null) ? totemPrefabs.GetPrefab(type) : null;
+        GameObject obj;
+
+        if (prefab != null)
+            obj = Instantiate(prefab, pos, Quaternion.identity, totemParent);
+        else
+        {
+            obj = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            obj.transform.SetParent(totemParent);
+            obj.transform.position = pos;
+            obj.transform.localScale = new Vector3(0.6f, 1.2f, 0.6f);
+        }
+
+        obj.name = "TotemTower";
+
+        var marker = obj.GetComponent<PlacedTotemMarker>();
+        if (marker == null) marker = obj.AddComponent<PlacedTotemMarker>();
+        marker.totemType = type;
+
+        var tower = obj.GetComponent<TotemTower>();
+        if (tower == null) tower = obj.AddComponent<TotemTower>();
+
+        var data = TotemDatabase.Instance != null ? TotemDatabase.Instance.Get(type) : null;
+        tower.ApplyData(data);
+    }
+
+    // =================================================
+    // Utils
+    // =================================================
     GameObject GetOrePrefab(ResourceType type)
     {
         return type switch
@@ -93,44 +217,31 @@ public class VoxelClickSpawner : MonoBehaviour
         };
     }
 
-    void SpawnSpawner(Vector3 worldPos)
+    int GetCurrentSpawnerCount()
     {
-        GameObject spawnerObj;
-
-        if (slimeSpawnerPrefab != null)
-            spawnerObj = Instantiate(slimeSpawnerPrefab, worldPos, Quaternion.identity, spawnerParent);
-        else
-        {
-            spawnerObj = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            spawnerObj.transform.SetParent(spawnerParent);
-            spawnerObj.transform.position = worldPos;
-            spawnerObj.transform.localScale = Vector3.one * 0.85f;
-        }
-
-        spawnerObj.name = "SlimeSpawner";
-
-        var comp = spawnerObj.GetComponent<SlimeSpawner>();
-        if (comp == null) spawnerObj.AddComponent<SlimeSpawner>();
+        if (spawnerParent != null) return spawnerParent.childCount;
+        return FindObjectsOfType<SlimeSpawner>().Length;
     }
 
-    void SpawnOre(ResourceType type, GameObject prefab, Vector3 worldPos)
+    bool IsPointerOverUI()
     {
-        GameObject ore;
+        if (EventSystem.current == null) return false;
 
-        if (prefab != null)
-            ore = Instantiate(prefab, worldPos, Quaternion.identity, oreParent);
-        else
-        {
-            ore = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            ore.transform.SetParent(oreParent);
-            ore.transform.position = worldPos;
-            ore.transform.localScale = Vector3.one * 0.9f;
-        }
+        if (EventSystem.current.IsPointerOverGameObject())
+            return true;
 
-        ore.name = type + "_Ore";
+        if (Input.touchCount > 0)
+            return EventSystem.current.IsPointerOverGameObject(Input.GetTouch(0).fingerId);
 
-        var marker = ore.GetComponent<PlacedOreMarker>();
-        if (marker == null) marker = ore.AddComponent<PlacedOreMarker>();
-        marker.oreType = type;
+        return false;
+    }
+
+    void EnsureParent(ref Transform parent, string name)
+    {
+        if (parent != null) return;
+
+        var go = GameObject.Find(name);
+        if (go == null) go = new GameObject(name);
+        parent = go.transform;
     }
 }

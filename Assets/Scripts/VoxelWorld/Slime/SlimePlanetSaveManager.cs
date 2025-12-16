@@ -6,14 +6,14 @@ using UnityEngine;
 public class SlimePlanetSaveManager : MonoBehaviour
 {
     [Header("Refs")]
-    public SlimeGameManager game;
     public VoxelWorld voxelWorld;
 
-    [Header("Parents (없으면 자동 찾기/생성)")]
-    public Transform oreParent;      // "OreObjects"
-    public Transform spawnerParent;  // "SlimeSpawners"
+    [Header("Parents (없으면 자동 생성)")]
+    public Transform oreParent;        // OreObjects
+    public Transform spawnerParent;    // SlimeSpawners
+    public Transform totemParent;      // TotemTowers
 
-    [Header("Prefabs (복원용, 없으면 큐브로 복원)")]
+    [Header("Prefabs (복원용, 없으면 Primitive로 생성)")]
     public GameObject copperPrefab;
     public GameObject silverPrefab;
     public GameObject goldPrefab;
@@ -21,18 +21,27 @@ public class SlimePlanetSaveManager : MonoBehaviour
     public GameObject mithrilPrefab;
     public GameObject slimeSpawnerPrefab;
 
+    [Header("Totem Prefab (없으면 Cylinder)")]
+    public GameObject totemPrefab;
+
+    [Header("행성 이동 시 슬라임 처리")]
+    public bool clearSlimesOnPlanetLoad = true;
+    public bool burstSpawnOnPlanetLoad = true;
+    public int burstSpawnCountPerSpawner = 5;
+
     [Header("Debug")]
     public bool logDebug = true;
+
+    // =========================
+    // Save Data
+    // =========================
 
     [Serializable]
     class SaveData
     {
-        // 자원
-        public long coin, soil, copper, silver, gold, metal, mithril;
-
-        // 설치물
         public List<PlacedOre> ores = new();
         public List<PlacedSpawner> spawners = new();
+        public List<PlacedTotem> totems = new();
     }
 
     [Serializable]
@@ -50,18 +59,22 @@ public class SlimePlanetSaveManager : MonoBehaviour
         public Quaternion rot;
     }
 
-    string GetPlanetFilePath()
+    [Serializable]
+    class PlacedTotem
     {
-        var pm = PlanetManager.Instance;
-        var p = pm != null ? pm.CurrentPlanet : null;
-        string id = (p != null) ? p.id : "no_planet";
-        return Path.Combine(Application.persistentDataPath, $"planet_{id}.json");
+        public TotemType type;
+        public Vector3 pos;
+        public Quaternion rot;
     }
+
+    // =========================
+    // Unity Events
+    // =========================
 
     void Awake()
     {
-        if (game == null) game = SlimeGameManager.Instance;
-        if (voxelWorld == null) voxelWorld = FindObjectOfType<VoxelWorld>();
+        if (voxelWorld == null)
+            voxelWorld = FindObjectOfType<VoxelWorld>();
 
         EnsureParents();
     }
@@ -76,47 +89,30 @@ public class SlimePlanetSaveManager : MonoBehaviour
         SaveNow();
     }
 
-    // 버튼으로 행성 바꾼 직후 호출해줘야 하는 함수
+    // =========================
+    // Public API
+    // =========================
+
+    /// <summary>
+    /// PlanetUIBinder에서 행성 이동 시 호출
+    /// </summary>
     public void LoadCurrentPlanet()
     {
         EnsureParents();
 
-        // 1) 월드 먼저 재생성 (현재 행성 seed 기준)
-        if (voxelWorld != null) voxelWorld.Regenerate();
+        // 1) 월드 재생성 (Seed 기준)
+        if (voxelWorld != null)
+            voxelWorld.Regenerate();
 
         // 2) 데이터 로드
-        var path = GetPlanetFilePath();
-        SaveData data = null;
+        SaveData data = LoadPlanetData();
 
-        if (File.Exists(path))
-        {
-            try { data = JsonUtility.FromJson<SaveData>(File.ReadAllText(path)); }
-            catch { data = null; }
-        }
-
-        if (data == null)
-        {
-            data = new SaveData();
-            // 처음 행성은 빈 데이터로 시작
-            Write(data);
-        }
-
-        // 3) 자원 적용
-        if (game != null)
-        {
-            game.SetResource(ResourceType.Coin, data.coin);
-            game.SetResource(ResourceType.Soil, data.soil);
-            game.SetResource(ResourceType.Copper, data.copper);
-            game.SetResource(ResourceType.Silver, data.silver);
-            game.SetResource(ResourceType.Gold, data.gold);
-            game.SetResource(ResourceType.Metal, data.metal);
-            game.SetResource(ResourceType.Mithril, data.mithril);
-        }
-
-        // 4) 설치물 복원 (기존 삭제 후)
+        // 3) 기존 설치물 제거
         ClearChildren(oreParent);
         ClearChildren(spawnerParent);
+        ClearChildren(totemParent);
 
+        // 4) 설치물 복원
         for (int i = 0; i < data.ores.Count; i++)
         {
             var o = data.ores[i];
@@ -129,7 +125,17 @@ public class SlimePlanetSaveManager : MonoBehaviour
             SpawnSpawner(s.pos, s.rot, spawnerParent);
         }
 
-        if (logDebug) Debug.Log($"[PlanetLoad] path={path} ores={data.ores.Count} spawners={data.spawners.Count}");
+        for (int i = 0; i < data.totems.Count; i++)
+        {
+            var t = data.totems[i];
+            SpawnTotem(t.type, t.pos, t.rot, totemParent);
+        }
+
+        // 5) 슬라임 리셋 & 재스폰
+        AfterPlanetLoaded_ResetSlimes();
+
+        if (logDebug)
+            Debug.Log($"[PlanetLoad] ores={data.ores.Count}, spawners={data.spawners.Count}, totems={data.totems.Count}");
     }
 
     public void SaveNow()
@@ -138,19 +144,7 @@ public class SlimePlanetSaveManager : MonoBehaviour
 
         var data = new SaveData();
 
-        // 자원 저장
-        if (game != null)
-        {
-            data.coin = game.GetResource(ResourceType.Coin);
-            data.soil = game.GetResource(ResourceType.Soil);
-            data.copper = game.GetResource(ResourceType.Copper);
-            data.silver = game.GetResource(ResourceType.Silver);
-            data.gold = game.GetResource(ResourceType.Gold);
-            data.metal = game.GetResource(ResourceType.Metal);
-            data.mithril = game.GetResource(ResourceType.Mithril);
-        }
-
-        // 광맥 저장 (PlacedOreMarker 기반)
+        // 광석 저장
         if (oreParent != null)
         {
             for (int i = 0; i < oreParent.childCount; i++)
@@ -182,44 +176,100 @@ public class SlimePlanetSaveManager : MonoBehaviour
             }
         }
 
-        Write(data);
+        // 토탬 저장
+        if (totemParent != null)
+        {
+            for (int i = 0; i < totemParent.childCount; i++)
+            {
+                var tr = totemParent.GetChild(i);
+                var marker = tr.GetComponent<PlacedTotemMarker>();
+                if (marker == null) continue;
 
-        if (logDebug) Debug.Log($"[PlanetSave] path={GetPlanetFilePath()} ores={data.ores.Count} spawners={data.spawners.Count}");
+                data.totems.Add(new PlacedTotem
+                {
+                    type = marker.totemType,
+                    pos = tr.position,
+                    rot = tr.rotation
+                });
+            }
+        }
+
+        WritePlanetData(data);
+
+        if (logDebug)
+            Debug.Log($"[PlanetSave] ores={data.ores.Count}, spawners={data.spawners.Count}, totems={data.totems.Count}");
     }
 
-    void Write(SaveData data)
+    // =========================
+    // Planet File
+    // =========================
+
+    string GetPlanetFilePath()
+    {
+        var pm = PlanetManager.Instance;
+        var p = pm != null ? pm.CurrentPlanet : null;
+        string id = (p != null) ? p.id : "no_planet";
+        return Path.Combine(Application.persistentDataPath, $"planet_{id}.json");
+    }
+
+    SaveData LoadPlanetData()
+    {
+        var path = GetPlanetFilePath();
+
+        if (File.Exists(path))
+        {
+            try
+            {
+                return JsonUtility.FromJson<SaveData>(File.ReadAllText(path));
+            }
+            catch { }
+        }
+
+        var empty = new SaveData();
+        WritePlanetData(empty);
+        return empty;
+    }
+
+    void WritePlanetData(SaveData data)
     {
         var path = GetPlanetFilePath();
         Directory.CreateDirectory(Path.GetDirectoryName(path));
         File.WriteAllText(path, JsonUtility.ToJson(data, true));
     }
 
-    // -------------------------
-    // Parents / Helpers
-    // -------------------------
-    void EnsureParents()
-    {
-        if (oreParent == null)
-        {
-            var go = GameObject.Find("OreObjects");
-            if (go == null) go = new GameObject("OreObjects");
-            oreParent = go.transform;
-        }
+    // =========================
+    // Slime Reset & Respawn
+    // =========================
 
-        if (spawnerParent == null)
+    void AfterPlanetLoaded_ResetSlimes()
+    {
+        if (clearSlimesOnPlanetLoad)
+            ClearAllSlimes();
+
+        if (burstSpawnOnPlanetLoad)
+            BurstSpawnFromAllSpawners(burstSpawnCountPerSpawner);
+    }
+
+    void ClearAllSlimes()
+    {
+        var slimes = GameObject.FindGameObjectsWithTag("Slime");
+        for (int i = 0; i < slimes.Length; i++)
+            Destroy(slimes[i]);
+    }
+
+    void BurstSpawnFromAllSpawners(int countPerSpawner)
+    {
+        var spawners = FindObjectsOfType<SlimeSpawner>();
+        for (int i = 0; i < spawners.Length; i++)
         {
-            var go = GameObject.Find("SlimeSpawners");
-            if (go == null) go = new GameObject("SlimeSpawners");
-            spawnerParent = go.transform;
+            spawners[i].ResetTimer();
+            spawners[i].SpawnBurst(countPerSpawner);
         }
     }
 
-    void ClearChildren(Transform parent)
-    {
-        if (parent == null) return;
-        for (int i = parent.childCount - 1; i >= 0; i--)
-            Destroy(parent.GetChild(i).gameObject);
-    }
+    // =========================
+    // Spawn Helpers
+    // =========================
 
     GameObject GetOrePrefab(ResourceType type)
     {
@@ -248,9 +298,13 @@ public class SlimePlanetSaveManager : MonoBehaviour
             ore.transform.SetParent(parent);
             ore.transform.SetPositionAndRotation(pos, rot);
             ore.transform.localScale = Vector3.one * 0.9f;
+
+            // 프리미어 머티리얼(있으면)
+            OreVisualUtil.ApplyOreMaterial(ore, type);
         }
 
         ore.name = type + "_Ore";
+        ore.tag = type.ToString();
 
         var marker = ore.GetComponent<PlacedOreMarker>();
         if (marker == null) marker = ore.AddComponent<PlacedOreMarker>();
@@ -273,13 +327,82 @@ public class SlimePlanetSaveManager : MonoBehaviour
             spawnerObj.transform.SetParent(parent);
             spawnerObj.transform.SetPositionAndRotation(pos, rot);
             spawnerObj.transform.localScale = Vector3.one * 0.85f;
+
+            // 핑크 프리미어 머티리얼(있으면)
+            OreVisualUtil.ApplySpawnerMaterial(spawnerObj);
         }
 
         spawnerObj.name = "SlimeSpawner";
 
-        var spawnerComp = spawnerObj.GetComponent<SlimeSpawner>();
-        if (spawnerComp == null) spawnerComp = spawnerObj.AddComponent<SlimeSpawner>();
+        if (spawnerObj.GetComponent<SlimeSpawner>() == null)
+            spawnerObj.AddComponent<SlimeSpawner>();
 
         return spawnerObj;
+    }
+
+    GameObject SpawnTotem(TotemType type, Vector3 pos, Quaternion rot, Transform parent)
+    {
+        GameObject obj;
+
+        if (totemPrefab != null)
+        {
+            obj = Instantiate(totemPrefab, pos, rot, parent);
+        }
+        else
+        {
+            obj = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            obj.transform.SetParent(parent);
+            obj.transform.SetPositionAndRotation(pos, rot);
+            obj.transform.localScale = new Vector3(0.6f, 1.2f, 0.6f);
+        }
+
+        obj.name = "TotemTower";
+
+        var marker = obj.GetComponent<PlacedTotemMarker>();
+        if (marker == null) marker = obj.AddComponent<PlacedTotemMarker>();
+        marker.totemType = type;
+
+        var tower = obj.GetComponent<TotemTower>();
+        if (tower == null) tower = obj.AddComponent<TotemTower>();
+
+        var data = TotemDatabase.Instance != null ? TotemDatabase.Instance.Get(type) : null;
+        tower.ApplyData(data);
+
+        return obj;
+    }
+
+    // =========================
+    // Utils
+    // =========================
+
+    void EnsureParents()
+    {
+        if (oreParent == null)
+        {
+            var go = GameObject.Find("OreObjects");
+            if (go == null) go = new GameObject("OreObjects");
+            oreParent = go.transform;
+        }
+
+        if (spawnerParent == null)
+        {
+            var go = GameObject.Find("SlimeSpawners");
+            if (go == null) go = new GameObject("SlimeSpawners");
+            spawnerParent = go.transform;
+        }
+
+        if (totemParent == null)
+        {
+            var go = GameObject.Find("TotemTowers");
+            if (go == null) go = new GameObject("TotemTowers");
+            totemParent = go.transform;
+        }
+    }
+
+    void ClearChildren(Transform parent)
+    {
+        if (parent == null) return;
+        for (int i = parent.childCount - 1; i >= 0; i--)
+            Destroy(parent.GetChild(i).gameObject);
     }
 }

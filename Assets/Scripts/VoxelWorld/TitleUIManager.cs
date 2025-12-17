@@ -11,7 +11,7 @@ public class TitleUIManager : MonoBehaviour
     public Button exitButton;
 
 
-    void Update()
+    void Start()
     {
         startButton.onClick.AddListener(StartButton);
         exitButton.onClick.AddListener(ExitButton);

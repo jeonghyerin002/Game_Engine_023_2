@@ -34,6 +34,8 @@ public class SlimeDailyResetSaveManager : MonoBehaviour
     string SavePath => Path.Combine(Application.persistentDataPath, saveFileName);
     SaveData data;
 
+    public OreMaterialBank oreMats;
+
     void Awake()
     {
         if (game == null) game = SlimeGameManager.Instance;
@@ -46,6 +48,11 @@ public class SlimeDailyResetSaveManager : MonoBehaviour
 
         if (enableReset)
             CheckAndDoResetIfNeeded();
+    }
+
+    void Start()
+    {
+        if (oreMats == null) oreMats = FindObjectOfType<OreMaterialBank>();
     }
 
     void Update()
@@ -291,13 +298,10 @@ public class SlimeDailyResetSaveManager : MonoBehaviour
             ore.transform.localScale = Vector3.one * 0.9f;
 
             var r = ore.GetComponent<MeshRenderer>();
-            if (r != null)
+            if (r != null && oreMats != null)
             {
-                var mat = new Material(Shader.Find("Standard"));
-                mat.color = GetOreColor(type);
-                mat.SetFloat("_Metallic", 0.9f);
-                mat.SetFloat("_Glossiness", 0.75f);
-                r.material = mat;
+                var mat = oreMats.Get(type);
+                if (mat != null) r.sharedMaterial = mat; // sharedMaterial로 메모리 절약
             }
         }
 

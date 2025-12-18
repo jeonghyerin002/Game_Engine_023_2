@@ -1674,6 +1674,7 @@ MonoBehaviour:
   blockWorldClickWhenPointerOverUI: 1
   spawnerBaseCost: 0
   spawnerCostStep: 1000
+  oreMats: {fileID: 0}
 --- !u!4 &266735194
 Transform:
   m_ObjectHideFlags: 0
@@ -4363,6 +4364,7 @@ MonoBehaviour:
   burstSpawnOnPlanetLoad: 1
   burstSpawnCountPerSpawner: 5
   logDebug: 1
+  oreMats: {fileID: 0}
 --- !u!114 &875966810
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -8500,6 +8502,57 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!1 &1873749372
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1873749374}
+  - component: {fileID: 1873749373}
+  m_Layer: 0
+  m_Name: MaterialBank
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1873749373
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1873749372}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7b92e59de307ae341bcbe190cac7b75c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  fallbackShader: {fileID: 0}
+  fallbackShaderName: Standard
+  copperMat: {fileID: 2100000, guid: 6ce721887c74d954090943870f10b6a2, type: 2}
+  silverMat: {fileID: 2100000, guid: 6b267f935709c4d44a151e1bbc1ce374, type: 2}
+  goldMat: {fileID: 2100000, guid: 333a8a347f5e3df4abd22c9deadae191, type: 2}
+  metalMat: {fileID: 2100000, guid: 0eaefabb844abf3409683c304acfef4e, type: 2}
+  mithrilMat: {fileID: 2100000, guid: f89a9de33389d5f4195a05b4189a2be9, type: 2}
+--- !u!4 &1873749374
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1873749372}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 40, y: 9, z: 60}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1875223684
 GameObject:
   m_ObjectHideFlags: 0
@@ -9674,3 +9727,4 @@ SceneRoots:
   - {fileID: 875966808}
   - {fileID: 496347788}
   - {fileID: 621041551}
+  - {fileID: 1873749374}

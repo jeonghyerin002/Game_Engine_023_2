@@ -32,6 +32,8 @@ public class SlimePlanetSaveManager : MonoBehaviour
     [Header("Debug")]
     public bool logDebug = true;
 
+    public OreMaterialBank oreMats;
+
     // =========================
     // Save Data
     // =========================
@@ -77,6 +79,11 @@ public class SlimePlanetSaveManager : MonoBehaviour
             voxelWorld = FindObjectOfType<VoxelWorld>();
 
         EnsureParents();
+    }
+
+    private void Start()
+    {
+        if (oreMats == null) oreMats = FindObjectOfType<OreMaterialBank>();
     }
 
     void OnApplicationPause(bool pause)
@@ -133,6 +140,8 @@ public class SlimePlanetSaveManager : MonoBehaviour
 
         // 5) 슬라임 리셋 & 재스폰
         AfterPlanetLoaded_ResetSlimes();
+
+        ApplyStartCoinIfRequested();
 
         if (logDebug)
             Debug.Log($"[PlanetLoad] ores={data.ores.Count}, spawners={data.spawners.Count}, totems={data.totems.Count}");
@@ -299,6 +308,13 @@ public class SlimePlanetSaveManager : MonoBehaviour
             ore.transform.SetPositionAndRotation(pos, rot);
             ore.transform.localScale = Vector3.one * 0.9f;
 
+            var r = ore.GetComponent<MeshRenderer>();
+            if (r != null && oreMats != null)
+            {
+                var mat = oreMats.Get(type);
+                if (mat != null) r.sharedMaterial = mat; // sharedMaterial로 메모리 절약
+            }
+
             // 프리미어 머티리얼(있으면)
             OreVisualUtil.ApplyOreMaterial(ore, type);
         }
@@ -404,5 +420,22 @@ public class SlimePlanetSaveManager : MonoBehaviour
         if (parent == null) return;
         for (int i = parent.childCount - 1; i >= 0; i--)
             Destroy(parent.GetChild(i).gameObject);
+    }
+
+    void ApplyStartCoinIfRequested()
+    {
+        // 타이틀에서 resetStartButton 눌렀을 때만 1로 세팅한다고 가정
+        if (PlayerPrefs.GetInt("ResetStart", 0) != 1) return;
+
+        var gm = SlimeGameManager.Instance;
+        if (gm != null)
+        {
+            gm.SetResource(ResourceType.Coin, 5000);
+            if (logDebug) Debug.Log("[PlanetLoad] ResetStart -> Coin set to 5000");
+        }
+
+        // 1회성
+        PlayerPrefs.DeleteKey("ResetStart");
+        PlayerPrefs.Save();
     }
 }

@@ -102,6 +102,8 @@ public class SlimeGameManager : MonoBehaviour
         BuildSellPriceMap();
 
         RefreshResourceUI();
+
+        ApplyDemoStartIfNeeded();
     }
 
     // -------------------------
@@ -329,6 +331,18 @@ public class SlimeGameManager : MonoBehaviour
 
         double rounded = Math.Floor(v * 10) / 10.0;
         return rounded.ToString("0.#") + units[unitIndex];
+    }
+
+    void ApplyDemoStartIfNeeded()
+    {
+        if (PlayerPrefs.GetInt("IsDemoStart", 0) != 1) return;
+
+        int coin = PlayerPrefs.GetInt("DemoStartCoin", 5000);
+        SetResource(ResourceType.Coin, coin);
+
+        PlayerPrefs.DeleteKey("IsDemoStart");
+        PlayerPrefs.DeleteKey("DemoStartCoin");
+        PlayerPrefs.Save();
     }
 
 #if UNITY_EDITOR

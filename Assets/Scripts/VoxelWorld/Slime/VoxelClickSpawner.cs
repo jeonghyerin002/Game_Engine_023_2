@@ -41,10 +41,13 @@ public class VoxelClickSpawner : MonoBehaviour
     public long spawnerBaseCost = 0;
     public long spawnerCostStep = 1000;
 
+    public OreMaterialBank oreMats;
+
     void Start()
     {
         if (save == null) save = FindObjectOfType<SlimePlanetSaveManager>();
         if (totemPrefabs == null) totemPrefabs = FindObjectOfType<TotemPrefabLibrary>();
+        if (oreMats == null) oreMats = FindObjectOfType<OreMaterialBank>();
 
         EnsureParent(ref oreParent, "OreObjects");
         EnsureParent(ref spawnerParent, "SlimeSpawners");
@@ -140,6 +143,14 @@ public class VoxelClickSpawner : MonoBehaviour
             ore.transform.SetParent(oreParent);
             ore.transform.position = pos;
             ore.transform.localScale = Vector3.one * 0.9f;
+
+            var r = ore.GetComponent<MeshRenderer>();
+            if (r != null && oreMats != null)
+            {
+                var mat = oreMats.Get(type);
+                if (mat != null) r.sharedMaterial = mat; // sharedMaterial로 메모리 절약
+            }
+
             OreVisualUtil.ApplyOreMaterial(ore, type);
         }
 
